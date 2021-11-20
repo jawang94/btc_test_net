@@ -1,5 +1,5 @@
 {
-  "name": "project_1",
+  "name": "btc_star_link",
   "version": "1.0.0",
   "description": "This project creates a Blockchain application to store data into the blocks",
   "main": "index.js",
@@ -7,7 +7,7 @@
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Udacity - jose.morales@udacity.com",
+  "author": "jason@makersplace.co",
   "license": "ISC",
   "dependencies": {
     "bitcoinjs-lib": "^4.0.3",
