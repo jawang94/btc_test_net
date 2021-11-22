@@ -41,6 +41,7 @@ class Block {
             // Save in auxiliary variable the current block hash
             const currentHash = self.hash;
             // Recalculate the hash of the Block
+            self.hash = null;
             const hashCheck = SHA256(JSON.stringify(self)).toString()
             // Comparing if the hashes changed
             if (hashCheck === currentHash) {
@@ -48,7 +49,7 @@ class Block {
               resolve(true);
             } else {
               // Returning the Block is not valid
-              reject(false);
+              resolve(false);
             }
         });
     }
@@ -69,14 +70,18 @@ class Block {
             // Reject with error
             reject(Error('POSSIBLE_GENESIS_BLOCK_ERROR: no previousBlockHash. Exiting...'));
           } else {
-            // Getting the encoded data saved in the Block
-            const encodedDataString = this.body;
-            // Decoding the data to retrieve the JSON representation of the object
-            const decodedDataString = hex2ascii(encodedDataString);
-            // Parse the data to an object to be retrieve.
-            const decodedDataobject = JSON.parse(decodedDataString)
-            // Resolve with the data if the object isn't the Genesis block
-            resolve(decodedDataobject);
+            try {
+              // Getting the encoded data saved in the Block
+              const encodedDataString = self.body;
+              // Decoding the data to retrieve the JSON representation of the object
+              const decodedDataString = hex2ascii(encodedDataString);
+              // Parse the data to an object to be retrieve.
+              const decodedDataobject = JSON.parse(decodedDataString)
+              // Resolve with the data if the object isn't the Genesis block
+              return resolve(decodedDataobject);
+            } catch (error) {
+              reject(Error('BLOCK_DATA_DECODE_ERROR. Exiting...'));
+            }
           }
         });
     }

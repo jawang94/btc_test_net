@@ -66,7 +66,7 @@ class Blockchain {
     _addBlock(block) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-          if (self.chain.height > -1) {
+          if (self.chain.length > 0) {
             const previousBlock = self.chain[self.chain.length - 1];
             block.previousBlockHash = previousBlock.hash;
           }
@@ -76,8 +76,12 @@ class Blockchain {
           if ((!block.previousBlockHash && self.chain.height >= 0) || !block.hash || !block.time) {
             reject(Error('Error adding block'));
           }
-          self.chain.push(block);
-          self.height += 1;
+          const errorLogs = await this.validateChain();
+          if (errorLogs.length) {
+            reject(Error(`${errorLogs}`));
+          }
+          this.chain.push(block);
+          this.height += 1;
           resolve(block);
         });
     }
@@ -121,9 +125,13 @@ class Blockchain {
           if (currentTime - requestTimeStamp >= FIVE_MINUTES_IN_MS) {
             reject(Error('TIME_EXPIRATION: request ownership verification expired..try again'));
           }
-          if (!bitcoinMessage.verify(message, address, signature)) {
-            reject(Error('WALLET_VERIFICATION_ERROR: wallet signature failed..try again'));
+
+          try {
+            await bitcoinMessage.verify(message, address, signature);            
+          } catch (error) {
+            reject('WALLET_VERIFICATION_ERROR: wallet signature failed..try again');
           }
+
           const newBlock = new BlockClass.Block({star, address});
           resolve(this._addBlock(newBlock));
         });
@@ -173,20 +181,21 @@ class Blockchain {
     getStarsByWalletAddress (address) {
         let self = this;
         return new Promise((resolve, reject) => {
-            const verifiedBlocks = self.chain.filter((block) => {
-              const blockData = block.getBData();
-              if (blockData?.address === address) return true;
-              return false
+            if (self.chain.length < 2) {
+              resolve([]);
+            }
+            const result = self.chain.slice(1).map((block) => {
+              try {
+                return block.getBData().then((data) => {
+                  return data;
+                })
+              } catch (error) {
+                reject(`BD_DATA_ERROR: ${JSON.stringify(block)}`)
+              }
             });
-            if (!verifiedBlocks.length) {
-              reject(Error('BLOCK_FILTER_ERROR: no matching blocks found'));
-            }
-            const stars = verifiedBlocks.map((block) => block.getBData());
-            if (!stars.length) {
-              reject(Error('BLOCK_DATA_RETRIEVAL_ERROR: unable to decode block data'));
-            }
-            resolve(stars);
-        }).catch((err) => console.log(`CRITICAL_ERROR: ${err}`));
+
+            resolve(result);
+        });
     }
 
     /**
@@ -199,17 +208,24 @@ class Blockchain {
         let self = this;
         let errorLog = [];
         return new Promise(async (resolve, reject) => {
-            for (let i = 0; i <= self.height; i += 1) {
+            if (self.height < 0) {
+              resolve(errorLog);
+            }
+
+            for (let i = 0; i <= self.height; i++) {
               const block = self.chain[i];
-              if (!block.validate()) {
-                errorLog.push(`BLOCK_VALIDATION_ERROR: ${block}`)
+              const blockValid = await block.validate();
+              if (!blockValid) {
+                errorLog.push(`BLOCK_HASH_VALIDATION_ERROR: ${JSON.stringify(block)}`)
               }
-              if (i > 0) {
+              if (self.chain.length > 0 && i > 0) {
                 if (block[i].previousBlockHash !== block[i - 1].hash) {
-                  errorLog.push(`MERKLE_TREE_ERROR: hash history discrepancy ${block[i - 1]} -> ${block[i]}`);
+                  errorLog.push(`MERKLE_TREE_ERROR: block history discrepancy ${block[i - 1]} -> ${block[i]}`);
                 }
               }
             }
+
+            resolve(errorLog);
         });
     }
 
