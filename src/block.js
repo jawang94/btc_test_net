@@ -43,6 +43,7 @@ class Block {
             // Recalculate the hash of the Block
             self.hash = null;
             const hashCheck = SHA256(JSON.stringify(self)).toString()
+            self.hash = currentHash;
             // Comparing if the hashes changed
             if (hashCheck === currentHash) {
               // Returning the Block is valid
@@ -78,7 +79,7 @@ class Block {
               // Parse the data to an object to be retrieve.
               const decodedDataobject = JSON.parse(decodedDataString)
               // Resolve with the data if the object isn't the Genesis block
-              return resolve(decodedDataobject);
+              resolve(decodedDataobject);
             } catch (error) {
               reject(Error('BLOCK_DATA_DECODE_ERROR. Exiting...'));
             }

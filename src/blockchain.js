@@ -66,8 +66,8 @@ class Blockchain {
     _addBlock(block) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-          if (self.chain.length > 0) {
-            const previousBlock = self.chain[self.chain.length - 1];
+          if (self.height > -1) {
+            const previousBlock = self.chain[self.height];
             block.previousBlockHash = previousBlock.hash;
           }
           block.height = self.chain.length;
@@ -76,7 +76,7 @@ class Blockchain {
           if ((!block.previousBlockHash && self.chain.height >= 0) || !block.hash || !block.time) {
             reject(Error('Error adding block'));
           }
-          const errorLogs = await this.validateChain();
+          const errorLogs = await self.validateChain();
           if (errorLogs.length) {
             reject(Error(`${errorLogs}`));
           }
@@ -133,7 +133,7 @@ class Blockchain {
           }
 
           const newBlock = new BlockClass.Block({star, address});
-          resolve(this._addBlock(newBlock));
+          resolve(self._addBlock(newBlock));
         });
     }
 
@@ -186,15 +186,14 @@ class Blockchain {
             }
             const result = self.chain.slice(1).map((block) => {
               try {
-                return block.getBData().then((data) => {
-                  return data;
-                })
+                const blockData = block.getBData();
+                return blockData;
               } catch (error) {
                 reject(`BD_DATA_ERROR: ${JSON.stringify(block)}`)
               }
             });
 
-            resolve(result);
+            resolve(Promise.all(result));
         });
     }
 
@@ -212,17 +211,21 @@ class Blockchain {
               resolve(errorLog);
             }
 
-            for (let i = 0; i <= self.height; i++) {
-              const block = self.chain[i];
-              const blockValid = await block.validate();
-              if (!blockValid) {
-                errorLog.push(`BLOCK_HASH_VALIDATION_ERROR: ${JSON.stringify(block)}`)
-              }
-              if (self.chain.length > 0 && i > 0) {
-                if (block[i].previousBlockHash !== block[i - 1].hash) {
-                  errorLog.push(`MERKLE_TREE_ERROR: block history discrepancy ${block[i - 1]} -> ${block[i]}`);
+            try {
+              for (let i = 0; i < self.chain.length; i++) {
+                const block = self.chain[i];
+                const blockValid = block.validate();
+                if (!blockValid) {
+                  errorLog.push(`BLOCK_HASH_VALIDATION_ERROR: ${JSON.stringify(block)}`)
+                }
+                if (self.height > 0 && i > 0) {
+                  if (self.chain[i].previousBlockHash !== self.chain[i - 1].hash) {
+                    errorLog.push(`MERKLE_TREE_ERROR: block history discrepancy ${block[i - 1]} -> ${block[i]}`);
+                  }
                 }
               }
+            } catch (error) {
+              resolve([...errorLog, error]);
             }
 
             resolve(errorLog);
